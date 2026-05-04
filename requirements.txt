@@ -1,0 +1,12 @@
+Flask==3.0.0
+flask-cors==4.0.0
+librosa==0.10.1
+mutagen==1.47.0
+numpy>=1.26.0
+scipy>=1.11.0
+soundfile==0.12.1
+Werkzeug==3.0.1
+waitress>=2.1.2
+faster-whisper>=0.10.0
+torch>=2.0.0
+torchaudio>=2.0.0

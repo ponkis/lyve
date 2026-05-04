@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Lyve</title>
+      <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon-96x96.png') }}" sizes="96x96" />
+      <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}" />
+      <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" />
+      <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}" />
+      <meta name="apple-mobile-web-app-title" content="Lyve" />
+      <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}" />
+      <link rel="stylesheet" href="/static/style.css">
+      <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;700&display=swap" rel="stylesheet">
+      <style>
+         .title {
+         font-family: 'EB Garamond', serif !important;
+         }
+      </style>
+   </head>
+   <body>
+      <div class="flash-overlay" id="flash-overlay"></div>
+      <div class="visualization-mode" id="visualization-mode">
+         <div id="lyrics-world"></div>
+         <div class="esc-hint">Press ESC to exit</div>
+      </div>
+      <div class="container" id="main-container">
+         <h1 class="title">Lyve<span class="powered-by">Powered by: <a href="https://ponkis.xyz" target="_blank" rel="noreferrer"><img src="https://ponkis.xyz/assets/img/global/logo.png" alt="Ponk" class="logo"></a></span></h1>
+         <div id="upload-section" class="upload-section">
+            <div class="upload-box">
+               <div class="upload-buttons-container">
+                  <button id="load-ponk-btn" class="upload-button secondary">Load .ponk File</button>
+                  <button id="upload-btn" class="upload-button">Choose Audio File</button>
+               </div>
+               <input type="file" id="file-input" accept=".mp3,.wav,.flac,.ogg,.m4a" hidden>
+               <input type="file" id="ponk-file-input" accept=".ponk" hidden>
+               <p class="file-info">AI-POWERED LYRIC TRANSCRIPTION</p>
+               <div id="loading" class="loading" style="display: none;">
+                  <div class="spinner"></div>
+                  <p style="padding-top: 15px;">Processing audio...</p>
+                  <span class="status-text" style="display:block;margin-top:8px">Waiting to start...</span>
+               </div>
+            </div>
+         </div>
+         <div id="player-section" class="player-section" style="display: none;">
+            <audio id="audio-player" controls></audio>
+            <div class="info-box">
+               <p id="bpm-info">BPM: --</p>
+               <p id="lyrics-source">Lyrics: --</p>
+            </div>
+            <div class="lyrics-edit-section" id="lyrics-edit-section">
+               <div id="lyrics-editor-ai">
+                  <label class="lyrics-label">Edit Timed Lyrics</label>
+                  <div id="timed-words-container" class="timed-words-container">
+                  </div>
+               </div>
+               <button id="reprocess-btn" class="reprocess-button">Update Lyrics</button>
+            </div>
+            <div class="controls-box">
+               <label class="control-label">
+               <input type="checkbox" id="bpm-double" class="control-checkbox">
+               <span>Double BPM (2x faster lyrics)</span>
+               </label>
+            </div>
+            <div class="main-actions">
+               <button id="start-btn" class="start-button">Visualize</button>
+               <button id="download-ponk-btn" class="download-ponk-button">Download .ponk</button>
+               <button id="reset-btn" class="reset-button">New File</button>
+            </div>
+         </div>
+         <canvas id="lyrics-canvas"></canvas>
+      </div>
+      <div class="disclaimer">
+        <p><strong>Disclaimer:</strong> Please be aware that due to server specifications, you may experience slowdowns, errors, or long waiting times. Your patience is appreciated.</p>
+      </div>
+      <footer>
+         <div class="social-icons">
+            <a href="https://github.com/ponkis" target="_blank" rel="noopener noreferrer" title="GitHub">
+            <img src="https://ponkis.xyz/assets/img/index/github.png" class="icon" alt="GitHub icon">
+            </a>
+            <a href="https://soundcloud.com/s0ulrin" target="_blank" rel="noopener noreferrer" title="SoundCloud">
+            <img src="https://ponkis.xyz/assets/img/index/soundcloud.png" class="icon" alt="SoundCloud icon">
+            </a>
+            <a href="https://www.youtube.com/@s0ulr1n" target="_blank" rel="noopener noreferrer" title="YouTube">
+            <img src="https://ponkis.xyz/assets/img/index/youtube.png" class="icon" alt="YouTube icon">
+            </a>
+            <a href="https://music.apple.com/profile/ponkiss" target="_blank" rel="noopener noreferrer" title="Apple Music">
+            <img src="https://ponkis.xyz/assets/img/index/applemusic.png" class="icon" alt="Apple Music icon">
+            </a>
+            <a href="javascript:void(0)" onclick="alert('@ponkisita on Discord!')" style="cursor: pointer;" title="Discord">
+            <img src="https://ponkis.xyz/assets/img/index/discord.png" class="icon" alt="Discord icon">
+            </a>
+            <a href="https://www.last.fm/user/ponkisita" target="_blank" rel="noopener noreferrer" title="Last.fm">
+            <img src="https://ponkis.xyz/assets/img/index/lastfm.png" class="icon" alt="Last.fm icon">
+            </a>
+            <a href="https://ko-fi.com/ponkis" target="_blank" rel="noopener noreferrer" title="Ko-fi">
+            <img src="https://ponkis.xyz/assets/img/index/kofi.png" class="icon" alt="Ko-fi icon">
+            </a>
+         </div>
+         <p>brought to you by ponkis, visit <a href="https://ponkis.xyz" target="_blank" rel="noopener noreferrer">ponkis.xyz</a></p>
+         <ul class="links">
+            <li><a href="https://ponkis.xyz/contact" target="_blank" rel="noopener noreferrer">Contact</a></li>
+         </ul>
+      </footer>
+      <script src="/static/script.js"></script>
+   </body>
+</html>
