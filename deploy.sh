@@ -12,8 +12,15 @@ echo "📦 pulling latest code from git..."
 git checkout main
 git fetch origin
 git pull origin main
-git merge origin/dev
-git push origin main
+
+# Check if origin/dev remote branch exists before attempting to merge
+if git show-ref --verify --quiet refs/remotes/origin/dev; then
+    echo "🔄 merging origin/dev..."
+    git merge origin/dev
+    git push origin main
+else
+    echo "ℹ️ origin/dev branch does not exist on remote yet, skipping merge."
+fi
 
 echo "🐍 updating python environment dependencies..."
 if [ ! -d "venv" ]; then
