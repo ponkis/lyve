@@ -9,6 +9,7 @@ echo "📂 navigating to project directory..."
 cd "$PROJECT_DIR"
 
 echo "📦 pulling latest code from git..."
+git checkout -- deploy.sh
 git checkout main
 git fetch origin
 git pull origin main
