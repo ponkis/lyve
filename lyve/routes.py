@@ -146,6 +146,9 @@ def uploaded_file(filename):
 
 @lyve_bp.route("/status/<file_hash>")
 def status(file_hash):
+    if not file_hash.isalnum() or len(file_hash) != 64:
+        return jsonify({"error": "Invalid hash format"}), 400
+
     cached = load_cached_ponk(file_hash)
     if cached is not None:
         return jsonify(
@@ -210,6 +213,9 @@ def status(file_hash):
 
 @lyve_bp.route("/result/<file_hash>")
 def result(file_hash):
+    if not file_hash.isalnum() or len(file_hash) != 64:
+        return jsonify({"error": "Invalid hash format"}), 400
+
     cached = load_cached_ponk(file_hash)
     if cached is None:
         return jsonify({"status": "processing_or_missing"}), 404
