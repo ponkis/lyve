@@ -21,6 +21,13 @@
    <body>
       <div class="flash-overlay" id="flash-overlay"></div>
       <div class="visualization-mode" id="visualization-mode">
+         <div class="progress-bar-container">
+            <span class="progress-time current-time" id="progress-current-time">0:00</span>
+            <div class="progress-bar-bg">
+               <div class="progress-bar-fill" id="progress-bar-fill"></div>
+            </div>
+            <span class="progress-time total-time" id="progress-total-time">0:00</span>
+         </div>
          <div id="lyrics-world"></div>
          <div class="esc-hint">Press ESC to exit</div>
       </div>
@@ -42,7 +49,7 @@
             </div>
          </div>
          <div id="player-section" class="player-section" style="display: none;">
-            <audio id="audio-player" controls></audio>
+            <audio id="audio-player"></audio>
             <div class="info-box">
                <p id="bpm-info">BPM: --</p>
                <p id="lyrics-source">Lyrics: --</p>
@@ -80,9 +87,7 @@
             <a href="https://soundcloud.com/s0ulrin" target="_blank" rel="noopener noreferrer" title="SoundCloud">
             <img src="https://ponkis.xyz/assets/img/index/soundcloud.png" class="icon" alt="SoundCloud icon">
             </a>
-            <a href="https://www.youtube.com/@s0ulr1n" target="_blank" rel="noopener noreferrer" title="YouTube">
-            <img src="https://ponkis.xyz/assets/img/index/youtube.png" class="icon" alt="YouTube icon">
-            </a>
+
             <a href="https://music.apple.com/profile/ponkiss" target="_blank" rel="noopener noreferrer" title="Apple Music">
             <img src="https://ponkis.xyz/assets/img/index/applemusic.png" class="icon" alt="Apple Music icon">
             </a>
@@ -101,6 +106,13 @@
             <li><a href="https://ponkis.xyz/contact" target="_blank" rel="noopener noreferrer">Contact</a></li>
          </ul>
       </footer>
+      <div id="ponk-modal" class="modal-overlay">
+         <div class="modal-content">
+            <h3>.ponk File Loaded</h3>
+            <p id="ponk-modal-text">Please select the matching audio file for:<br><strong id="ponk-modal-filename"></strong></p>
+            <button id="ponk-modal-select-btn" class="upload-button">Select Audio File</button>
+         </div>
+      </div>
       <script src="/static/script.js"></script>
    </body>
 </html>

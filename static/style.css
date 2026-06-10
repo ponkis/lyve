@@ -619,3 +619,114 @@ footer .links li {
         font-size: 0.8em;
     }
 }
+
+/* Playback Progress Bar Styles */
+.progress-bar-container {
+    position: fixed;
+    top: 25px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    max-width: 800px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    z-index: 120;
+    pointer-events: none; /* Sleek non-seekable progress display */
+}
+
+.progress-time {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+    min-width: 45px;
+    text-align: center;
+    letter-spacing: 1px;
+}
+
+.progress-bar-bg {
+    flex-grow: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: #ffffff;
+    border-radius: 2px;
+    transition: width 0.1s linear;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+/* Glassmorphic Modal for .ponk Uploads */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-content {
+    background: rgba(18, 18, 18, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 2.5rem 2rem;
+    max-width: 450px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    transform: scale(0.9);
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.modal-overlay.active .modal-content {
+    transform: scale(1);
+}
+
+.modal-content h3 {
+    margin-top: 0;
+    font-family: 'EB Garamond', serif;
+    font-size: 1.75rem;
+    color: #fff;
+    margin-bottom: 1rem;
+    letter-spacing: 1px;
+}
+
+.modal-content p {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.95rem;
+    margin-bottom: 1.75rem;
+    line-height: 1.6;
+}
+
+.modal-content strong {
+    color: #4ECDC4;
+    word-break: break-all;
+}
+
+/* Adjust progress bar for small screens */
+@media (max-width: 600px) {
+    .progress-bar-container {
+        width: 85%;
+        top: 15px;
+    }
+}

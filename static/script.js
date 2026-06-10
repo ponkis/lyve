@@ -65,12 +65,21 @@ const flashOverlay = document.getElementById('flash-overlay');
 const lyricsEditTextarea = document.getElementById('lyrics-edit-textarea');
 const reprocessBtn = document.getElementById('reprocess-btn');
 const lyricsEditorAi = document.getElementById('lyrics-editor-ai');
+const lyricsEditSection = document.getElementById('lyrics-edit-section');
 const timedWordsContainer = document.getElementById('timed-words-container');
 const loadPonkBtn = document.getElementById('load-ponk-btn');
 const ponkFileInput = document.getElementById('ponk-file-input');
 const downloadPonkBtn = document.getElementById('download-ponk-btn');
 const lyricsWorld = document.getElementById('lyrics-world');
 const footer = document.querySelector('footer');
+
+// Progress Bar & .ponk Upload Modal Selectors
+const ponkModal = document.getElementById('ponk-modal');
+const ponkModalFilename = document.getElementById('ponk-modal-filename');
+const ponkModalSelectBtn = document.getElementById('ponk-modal-select-btn');
+const progressBarFill = document.getElementById('progress-bar-fill');
+const progressCurrentTime = document.getElementById('progress-current-time');
+const progressTotalTime = document.getElementById('progress-total-time');
 
 let flashInterval = null;
 let flashTimeout = null;
@@ -259,8 +268,15 @@ fileInput.addEventListener('change', async (e) => {
             lyricsSource.textContent = `Lyrics: ${sourceText}`;
             bpmInfo.textContent = `BPM: ${Math.round(data.bpm)}`;
 
-            lyricsEditorAi.style.display = 'block';
-            populateTimedWordsEditor(data.words);
+            if (data.lyrics_source && data.lyrics_source.startsWith('lrclib')) {
+               lyricsEditSection.style.display = 'none';
+               downloadPonkBtn.style.display = 'none';
+            } else {
+               lyricsEditSection.style.display = 'block';
+               lyricsEditorAi.style.display = 'block';
+               populateTimedWordsEditor(data.words);
+               downloadPonkBtn.style.display = 'block';
+            }
 
             uploadSection.style.display = 'none';
             playerSection.style.display = 'block';
@@ -296,8 +312,15 @@ fileInput.addEventListener('change', async (e) => {
          }
          lyricsSource.textContent = `Lyrics: ${sourceText}`;
 
-         lyricsEditorAi.style.display = 'block';
-         populateTimedWordsEditor(data.words);
+         if (data.lyrics_source && data.lyrics_source.startsWith('lrclib')) {
+            lyricsEditSection.style.display = 'none';
+            downloadPonkBtn.style.display = 'none';
+         } else {
+            lyricsEditSection.style.display = 'block';
+            lyricsEditorAi.style.display = 'block';
+            populateTimedWordsEditor(data.words);
+            downloadPonkBtn.style.display = 'block';
+         }
 
          uploadSection.style.display = 'none';
          playerSection.style.display = 'block';
@@ -378,6 +401,10 @@ document.addEventListener('keydown', (e) => {
 function exitVisualization() {
    stopVisualization();
 
+   if (progressBarFill) progressBarFill.style.width = '0%';
+   if (progressCurrentTime) progressCurrentTime.textContent = '0:00';
+   if (progressTotalTime) progressTotalTime.textContent = '0:00';
+
    visualizationMode.classList.remove('active');
    visualizationMode.removeEventListener('wheel', handleZoom);
    visualizationMode.removeEventListener('mousedown', handleDragStart);
@@ -437,6 +464,12 @@ resetBtn.addEventListener('click', () => {
    if (loadPonkBtn) loadPonkBtn.classList.remove('loaded');
 });
 
+bpmDoubleCheckbox.addEventListener('change', () => {
+   if (!audioData) return;
+   const displayBpm = bpmDoubleCheckbox.checked ? audioData.bpm * 2 : audioData.bpm;
+   bpmInfo.textContent = `BPM: ${Math.round(displayBpm)}`;
+});
+
 audioPlayer.addEventListener('ended', () => {
    exitVisualization();
    startBtn.disabled = false;
@@ -447,6 +480,35 @@ audioPlayer.addEventListener('pause', () => {
    if (animationInterval && visualizationMode.classList.contains('active')) {
       exitVisualization();
       startBtn.disabled = false;
+   }
+});
+
+function formatTime(seconds) {
+   if (isNaN(seconds) || seconds === null) return '0:00';
+   const mins = Math.floor(seconds / 60);
+   const secs = Math.floor(seconds % 60);
+   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+audioPlayer.addEventListener('timeupdate', () => {
+   if (!audioPlayer || isNaN(audioPlayer.duration)) return;
+   const current = audioPlayer.currentTime;
+   const duration = audioPlayer.duration;
+   if (progressCurrentTime) {
+      progressCurrentTime.textContent = formatTime(current);
+   }
+   if (progressTotalTime) {
+      progressTotalTime.textContent = formatTime(duration);
+   }
+   if (progressBarFill) {
+      const percentage = (current / duration) * 100;
+      progressBarFill.style.width = `${percentage}%`;
+   }
+});
+
+audioPlayer.addEventListener('durationchange', () => {
+   if (audioPlayer && !isNaN(audioPlayer.duration) && progressTotalTime) {
+      progressTotalTime.textContent = formatTime(audioPlayer.duration);
    }
 });
 
@@ -715,11 +777,14 @@ ponkFileInput.addEventListener('change', (e) => {
    reader.onload = (event) => {
       try {
          ponkFileContent = JSON.parse(event.target.result);
-         alert(`.ponk file loaded for "${ponkFileContent.metadata.originalFilename}". Please select the matching audio file now.`);
+         
+         // Display modal to ensure user-gesture compliance
+         if (ponkModal && ponkModalFilename) {
+            ponkModalFilename.textContent = ponkFileContent.metadata.originalFilename;
+            ponkModal.classList.add('active');
+         }
 
          if (loadPonkBtn) loadPonkBtn.classList.add('loaded');
-
-         fileInput.click();
       } catch (error) {
          alert('Invalid .ponk file format.');
          ponkFileContent = null;
@@ -729,6 +794,13 @@ ponkFileInput.addEventListener('change', (e) => {
    };
    reader.readAsText(file);
 });
+
+if (ponkModalSelectBtn) {
+   ponkModalSelectBtn.addEventListener('click', () => {
+      if (fileInput) fileInput.click();
+      if (ponkModal) ponkModal.classList.remove('active');
+   });
+}
 
 downloadPonkBtn.addEventListener('click', () => {
    if (!audioData) {
