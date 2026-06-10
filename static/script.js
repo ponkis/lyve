@@ -289,6 +289,10 @@ fileInput.addEventListener('change', async (e) => {
             sourceText = 'Generated (No metadata found)';
          } else if (data.lyrics_source === 'ai') {
             sourceText = 'AI Transcription (Whisper)';
+         } else if (data.lyrics_source === 'lrclib') {
+            sourceText = 'Synced Lyrics (LRCLIB)';
+         } else if (data.lyrics_source === 'lrclib_unsynced') {
+            sourceText = 'Unsynced Lyrics (LRCLIB)';
          }
          lyricsSource.textContent = `Lyrics: ${sourceText}`;
 
@@ -451,7 +455,7 @@ audioPlayer.addEventListener('seeked', () => {
 
    const currentTime = audioPlayer.currentTime;
 
-   if (audioData.lyrics_source === 'ai' && audioData.words[0].hasOwnProperty('start')) {
+   if (audioData.words && audioData.words.length > 0 && audioData.words[0] && audioData.words[0].hasOwnProperty('start')) {
 
       wordIndex = audioData.words.findIndex(word => word.start >= currentTime);
       if (wordIndex === -1) wordIndex = audioData.words.length;
@@ -467,7 +471,7 @@ function startVisualization() {
 
    isPlaying = true;
 
-   if (audioData.lyrics_source === 'ai' && audioData.words[0].hasOwnProperty('start')) {
+   if (audioData.words && audioData.words.length > 0 && audioData.words[0] && audioData.words[0].hasOwnProperty('start')) {
       function scheduleNextWord() {
          if (wordIndex >= audioData.words.length || !isPlaying) {
             return;

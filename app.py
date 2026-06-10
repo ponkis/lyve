@@ -17,7 +17,10 @@ import json
 import threading
 import queue as pyqueue
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import re
+import urllib.request
+import urllib.parse
 
 app = Flask(__name__)
 CORS(app)
@@ -155,7 +158,7 @@ def queue_dispatcher():
             if not item:
                 processing_queue.task_done()
                 continue
-            filepath, file_hash, filename, is_ponk_validation = item
+            filepath, file_hash, filename, is_ponk_validation, original_filename = item
 
             with pending_lock:
                 try:
@@ -171,7 +174,7 @@ def queue_dispatcher():
                         {
                             "progress": 1,
                             "status": "starting",
-                            "updated_at": datetime.utcnow().isoformat(),
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
                         },
                         pf,
                     )
@@ -179,7 +182,7 @@ def queue_dispatcher():
                 pass
 
             try:
-                process_file_async(filepath, file_hash, filename, is_ponk_validation)
+                process_file_async(filepath, file_hash, filename, is_ponk_validation, original_filename)
             except Exception as e:
                 print(f"Dispatcher failed processing {file_hash}: {e}")
 
@@ -194,6 +197,292 @@ try:
     dispatcher.start()
 except Exception as e:
     print(f"Failed to start queue dispatcher: {e}")
+
+
+def parse_filename_fallback(original_filename):
+    """
+    Extracts artist and title from filename by splitting on common separators.
+    """
+    if not original_filename:
+        return "", ""
+    base, _ = os.path.splitext(original_filename)
+    # Common separators: " - ", " -", "- ", "-"
+    for sep in [" - ", " -", "- ", "-"]:
+        if sep in base:
+            parts = base.split(sep, 1)
+            artist = parts[0].strip()
+            title = parts[1].strip()
+            if artist and title:
+                return artist, title
+    return "", base.strip()
+
+
+def extract_metadata_and_bpm(file_path, original_filename):
+    """
+    Extracts artist, title, album, and bpm tags from the file using mutagen.
+    Falls back to filename parsing if artist/title are empty.
+    """
+    artist, title, album, bpm = "", "", "", None
+    
+    # Try reading tags via mutagen.File easy=True
+    try:
+        audio = mutagen.File(file_path, easy=True)
+        if audio is not None:
+            artist = audio.get("artist", [""])[0].strip()
+            title = audio.get("title", [""])[0].strip()
+            album = audio.get("album", [""])[0].strip()
+            bpm_val = audio.get("bpm")
+            if bpm_val:
+                try:
+                    bpm = float(bpm_val[0])
+                except (ValueError, TypeError):
+                    pass
+            # Some easy tags map tempo to "tempo"
+            if bpm is None:
+                tempo_val = audio.get("tempo")
+                if tempo_val:
+                    try:
+                        bpm = float(tempo_val[0])
+                    except (ValueError, TypeError):
+                        pass
+    except Exception as e:
+        print(f"Error reading easy mutagen tags: {e}")
+
+    # Fallback to raw tags if EasyID3/EasyTag didn't capture bpm
+    if bpm is None:
+        try:
+            audio_raw = mutagen.File(file_path)
+            if audio_raw is not None:
+                # MP3 (ID3 tags)
+                if hasattr(audio_raw, "tags") and audio_raw.tags:
+                    for tag in ["TBPM", "bpm", "tempo"]:
+                        if tag in audio_raw.tags:
+                            try:
+                                val = audio_raw.tags[tag]
+                                if hasattr(val, "text"):
+                                    bpm = float(val.text[0])
+                                else:
+                                    bpm = float(val[0])
+                                break
+                            except (ValueError, TypeError, IndexError):
+                                pass
+                # MP4/M4A
+                if bpm is None and hasattr(audio_raw, "get"):
+                    tmpo = audio_raw.get("tmpo")
+                    if tmpo:
+                        try:
+                            bpm = float(tmpo[0])
+                        except (ValueError, TypeError):
+                            pass
+        except Exception as e:
+            print(f"Error reading raw mutagen tags: {e}")
+
+    # Fallback to filename if artist or title is missing
+    if not artist or not title:
+        f_artist, f_title = parse_filename_fallback(original_filename)
+        if not artist and f_artist:
+            artist = f_artist
+        if not title and f_title:
+            title = f_title
+
+    # Filter out empty bpm values (e.g. 0.0)
+    if bpm is not None and bpm <= 0:
+        bpm = None
+
+    return artist, title, album, bpm
+
+
+def fetch_lyrics_from_lrclib(artist, title, album, duration):
+    """
+    Fetches lyrics from lrclib.net.
+    1. Tries /api/get (strict)
+    2. Tries /api/search?q=... (fuzzy) and finds the closest duration match
+    Returns dict with {"syncedLyrics": ..., "plainLyrics": ..., "instrumental": ...} or None.
+    """
+    if not artist or not title:
+        return None
+        
+    user_agent = "Lyve/1.0 (https://github.com/ponkis/lyve)"
+    
+    # 1. Try strict GET /api/get
+    try:
+        params = {
+            "artist_name": artist,
+            "track_name": title,
+            "album_name": album or "",
+            "duration": int(duration) if duration else 0
+        }
+        query_string = urllib.parse.urlencode(params)
+        url = f"https://lrclib.net/api/get?{query_string}"
+        
+        req = urllib.request.Request(url, headers={"User-Agent": user_agent})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            if resp.status == 200:
+                data = json.loads(resp.read().decode('utf-8'))
+                if data:
+                    return data
+    except urllib.error.HTTPError as e:
+        # 404 is normal if not found, let it proceed to search
+        if e.code != 404:
+            print(f"LRCLIB strict lookup HTTP error: {e.code}")
+    except Exception as e:
+        print(f"LRCLIB strict lookup error: {e}")
+
+    # 2. Try search GET /api/search?q=...
+    try:
+        query = f"{artist} {title}"
+        url = f"https://lrclib.net/api/search?q={urllib.parse.quote(query)}"
+        req = urllib.request.Request(url, headers={"User-Agent": user_agent})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            if resp.status == 200:
+                results = json.loads(resp.read().decode('utf-8'))
+                if results and isinstance(results, list):
+                    best_match = None
+                    best_diff = 999999.0
+                    
+                    for res in results:
+                        # Skip if there's no lyrics at all
+                        if not res.get("syncedLyrics") and not res.get("plainLyrics"):
+                            continue
+                        
+                        res_dur = res.get("duration")
+                        if res_dur is not None and duration:
+                            diff = abs(float(res_dur) - float(duration))
+                        else:
+                            diff = 999999.0
+                            
+                        # Accept if duration is within 15 seconds, or if we have no duration
+                        if not duration or diff <= 15.0:
+                            # Prefer synced lyrics, then select the one with smaller duration diff
+                            if best_match is None:
+                                best_match = res
+                                best_diff = diff
+                            else:
+                                # Prioritize synced lyrics over unsynced
+                                current_has_sync = bool(res.get("syncedLyrics"))
+                                best_has_sync = bool(best_match.get("syncedLyrics"))
+                                
+                                if current_has_sync and not best_has_sync:
+                                    best_match = res
+                                    best_diff = diff
+                                elif current_has_sync == best_has_sync:
+                                    if diff < best_diff:
+                                        best_match = res
+                                        best_diff = diff
+                                        
+                    if best_match:
+                        return best_match
+    except Exception as e:
+        print(f"LRCLIB search fallback error: {e}")
+        
+    return None
+
+
+def parse_lrc(lrc_text, duration):
+    """
+    Parses LRC format lyrics and interpolates line-level timestamps into word-level timestamps.
+    Returns a list of dicts: [{"word": word, "start": start, "end": end}, ...]
+    """
+    lines = []
+    if not lrc_text:
+        return lines
+
+    pattern = re.compile(r'\[(\d+):(\d+(?:\.\d+)?)]')
+    
+    for line in lrc_text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Find all timestamps in this line
+        matches = list(pattern.finditer(line))
+        if not matches:
+            continue
+            
+        # The text is after the last timestamp
+        last_match = matches[-1]
+        text = line[last_match.end():].strip()
+        
+        for match in matches:
+            minutes = int(match.group(1))
+            seconds = float(match.group(2))
+            time_in_seconds = minutes * 60 + seconds
+            lines.append({"time": time_in_seconds, "text": text})
+            
+    # Sort lines by start time
+    lines.sort(key=lambda x: x["time"])
+    
+    # Now interpolate words
+    words = []
+    for i, line_data in enumerate(lines):
+        line_start = line_data["time"]
+        line_text = line_data["text"]
+        words_in_line = line_text.split()
+        if not words_in_line:
+            continue
+            
+        # Determine when the line ends
+        if i < len(lines) - 1:
+            line_end = lines[i+1]["time"]
+        else:
+            line_end = duration if duration else (line_start + 5.0)
+            
+        line_duration = line_end - line_start
+        if line_duration <= 0:
+            line_duration = 2.0
+            
+        # Word timing heuristic: average words take 0.3 - 0.4 seconds, up to a max
+        total_words = len(words_in_line)
+        word_duration = max(0.15, min(0.4, line_duration / total_words))
+        
+        for j, w in enumerate(words_in_line):
+            start = line_start + j * word_duration
+            end = line_start + (j + 1) * word_duration
+            words.append({"word": w, "start": start, "end": end})
+            
+    return words
+
+
+def fetch_bpm_from_deezer(artist, title):
+    """
+    Fetches the BPM of a track from Deezer's public API.
+    """
+    if not artist or not title:
+        return None
+        
+    user_agent = "Lyve/1.0 (https://github.com/ponkis/lyve)"
+    
+    # Try strict first, then loose
+    queries = [
+        f'artist:"{artist}" track:"{title}"',
+        f"{artist} {title}"
+    ]
+    
+    for query in queries:
+        try:
+            url = f"https://api.deezer.com/search?q={urllib.parse.quote(query)}"
+            req = urllib.request.Request(url, headers={"User-Agent": user_agent})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    if data and "data" in data and len(data["data"]) > 0:
+                        # Retrieve the track detail endpoint using the track ID of the first match
+                        track_id = data["data"][0]["id"]
+                        track_url = f"https://api.deezer.com/track/{track_id}"
+                        
+                        track_req = urllib.request.Request(track_url, headers={"User-Agent": user_agent})
+                        with urllib.request.urlopen(track_req, timeout=10) as track_resp:
+                            if track_resp.status == 200:
+                                track_data = json.loads(track_resp.read().decode('utf-8'))
+                                bpm_val = track_data.get("bpm")
+                                if bpm_val:
+                                    bpm_float = float(bpm_val)
+                                    if bpm_float > 0:
+                                        return bpm_float
+        except Exception as e:
+            print(f"Error fetching BPM from Deezer with query '{query}': {e}")
+            
+    return None
 
 
 def allowed_file(filename):
@@ -253,9 +542,8 @@ def transcribe_with_local_whisper(file_path):
         return None, None
 
 
-def process_file_async(filepath, file_hash, filename, is_ponk_validation=False):
+def process_file_async(filepath, file_hash, filename, is_ponk_validation=False, original_filename=""):
     try:
-
         if load_cached_ponk(file_hash) is not None:
             return
     except Exception:
@@ -263,7 +551,9 @@ def process_file_async(filepath, file_hash, filename, is_ponk_validation=False):
 
     words = []
     lyrics = ""
-    lyrics_source = "ai"
+    lyrics_source = ""
+    bpm = None
+    duration = None
 
     progress_path = os.path.join(CACHE_FOLDER, f"{file_hash}.progress.json")
 
@@ -274,7 +564,7 @@ def process_file_async(filepath, file_hash, filename, is_ponk_validation=False):
                     {
                         "progress": int(pct),
                         "status": status_text,
-                        "updated_at": datetime.utcnow().isoformat(),
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
                     },
                     pf,
                 )
@@ -283,61 +573,100 @@ def process_file_async(filepath, file_hash, filename, is_ponk_validation=False):
 
     write_progress(1, "starting")
 
+    # Get duration early for API matching
+    try:
+        duration = librosa.get_duration(path=filepath)
+    except Exception as e:
+        print(f"Error getting duration early: {e}")
+
+    # Extract tags & parse filename
+    artist, title, album, tag_bpm = extract_metadata_and_bpm(filepath, original_filename or filename)
+    bpm = tag_bpm
+
     if not is_ponk_validation:
+        # 1. Try to fetch lyrics from LRCLIB
+        if artist and title:
+            write_progress(10, "fetching_lyrics")
+            lrclib_data = fetch_lyrics_from_lrclib(artist, title, album, duration)
+            if lrclib_data:
+                if lrclib_data.get("instrumental") is True:
+                    lyrics = "[Instrumental]"
+                    words = []
+                    lyrics_source = "lrclib"
+                elif lrclib_data.get("syncedLyrics"):
+                    synced_text = lrclib_data["syncedLyrics"]
+                    words = parse_lrc(synced_text, duration)
+                    if words:
+                        lyrics = lrclib_data.get("plainLyrics", "")
+                        if not lyrics:
+                            lyrics = " ".join([w["word"] for w in words])
+                        lyrics_source = "lrclib"
+                
+                # If synced lyrics were empty/failed, try plain lyrics
+                if not lyrics_source and lrclib_data.get("plainLyrics"):
+                    plain_text = lrclib_data["plainLyrics"]
+                    lyrics = plain_text
+                    words = plain_text.split()
+                    lyrics_source = "lrclib_unsynced"
 
-        try:
-            segments, info = model.transcribe(filepath, word_timestamps=True)
-            total_duration = (
-                info.duration if hasattr(info, "duration") and info.duration else None
-            )
-            if total_duration is None:
+        # 2. Fallback to AI (Whisper) transcription if LRCLIB failed/not found
+        if not lyrics_source:
+            write_progress(20, "ai_transcription")
+            try:
+                segments, info = model.transcribe(filepath, word_timestamps=True)
+                total_duration = (
+                    info.duration if hasattr(info, "duration") and info.duration else None
+                )
+                if total_duration is None:
+                    total_duration = duration
 
-                try:
-                    y_tmp, sr_tmp = librosa.load(filepath, duration=1)
-                    total_duration = librosa.get_duration(filename=filepath)
-                except Exception:
-                    total_duration = None
+                full_lyrics = ""
+                timed_words = []
+                last_end = 0.0
+                for i, segment in enumerate(segments):
+                    full_lyrics += segment.text + " "
+                    for word in getattr(segment, "words", []):
+                        timed_words.append(
+                            {"word": word.word, "start": word.start, "end": word.end}
+                        )
+                        last_end = max(last_end, word.end)
 
-            full_lyrics = ""
-            timed_words = []
-            last_end = 0.0
-            for i, segment in enumerate(segments):
-                full_lyrics += segment.text + " "
-                for word in getattr(segment, "words", []):
-                    timed_words.append(
-                        {"word": word.word, "start": word.start, "end": word.end}
-                    )
-                    last_end = max(last_end, word.end)
+                    if total_duration and last_end:
+                        pct = min(99, int((last_end / total_duration) * 100))
+                    else:
+                        pct = min(99, int(((i + 1) / max(1, len(segments))) * 100))
+                    write_progress(pct, "transcribing")
 
-                if total_duration and last_end:
-                    pct = min(99, int((last_end / total_duration) * 100))
-                else:
-
-                    pct = min(99, int(((i + 1) / max(1, len(segments))) * 100))
-                write_progress(pct, "transcribing")
-
-            words = timed_words
-            lyrics = full_lyrics.strip()
-        except Exception as e:
-            print(f"Error with local Whisper transcription: {e}")
-            lyrics = "AI transcription failed. Please try another file."
-            words = [
-                {"word": "AI", "start": 0, "end": 1},
-                {"word": "failed.", "start": 1, "end": 2},
-            ]
-            lyrics_source = "error"
+                words = timed_words
+                lyrics = full_lyrics.strip()
+                lyrics_source = "ai"
+            except Exception as e:
+                print(f"Error with local Whisper transcription: {e}")
+                lyrics = "AI transcription failed. Please try another file."
+                words = [
+                    {"word": "AI", "start": 0, "end": 1},
+                    {"word": "failed.", "start": 1, "end": 2},
+                ]
+                lyrics_source = "error"
 
     write_progress(95, "finalizing")
 
     try:
+        # Determine BPM: Mutagen tags -> Deezer API -> Librosa local estimation
+        if bpm is None and artist and title:
+            bpm = fetch_bpm_from_deezer(artist, title)
+            
+        if bpm is None:
+            bpm = detect_bpm(filepath)
 
-        try:
-            y, sr = librosa.load(filepath)
-            duration = librosa.get_duration(y=y, sr=sr)
-        except Exception:
-            duration = None
+        # Get final duration if we haven't already
+        if duration is None:
+            try:
+                duration = librosa.get_duration(path=filepath)
+            except Exception:
+                duration = None
+
         file_size = os.path.getsize(filepath)
-        bpm = detect_bpm(filepath)
 
         response_payload = {
             "success": True,
@@ -353,11 +682,10 @@ def process_file_async(filepath, file_hash, filename, is_ponk_validation=False):
         }
 
         cached_obj = response_payload.copy()
-
         cached_obj["filename"] = filename
         cached_obj["_meta"] = {
             "originalFilename": filename,
-            "cached_at": datetime.utcnow().isoformat(),
+            "cached_at": datetime.now(timezone.utc).isoformat(),
         }
         save_cached_ponk(file_hash, cached_obj)
 
@@ -412,7 +740,7 @@ def upload_file():
 
         try:
             print(
-                f"{datetime.utcnow().isoformat()} RECEIVED /upload for filename={file.filename} client={request.remote_addr}"
+                f"{datetime.now(timezone.utc).isoformat()} RECEIVED /upload for filename={file.filename} client={request.remote_addr}"
             )
         except Exception:
             pass
@@ -456,7 +784,7 @@ def upload_file():
                         {
                             "progress": 0,
                             "status": "queued",
-                            "updated_at": datetime.utcnow().isoformat(),
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
                         },
                         pf,
                     )
@@ -467,14 +795,14 @@ def upload_file():
                 pending_jobs.append(file_hash)
                 queue_position = len(pending_jobs)
 
-            processing_queue.put((filepath, file_hash, filename, is_ponk_validation))
+            processing_queue.put((filepath, file_hash, filename, is_ponk_validation, file.filename))
         except Exception as e:
             print(f"Failed to enqueue background worker: {e}")
             return jsonify({"error": "Failed to start processing"}), 500
 
         try:
             print(
-                f"{datetime.utcnow().isoformat()} RETURNING 202 for file_hash={file_hash} filename={filename}"
+                f"{datetime.now(timezone.utc).isoformat()} RETURNING 202 for file_hash={file_hash} filename={filename}"
             )
         except Exception:
             pass
