@@ -3,7 +3,7 @@
 set -e
 
 PROJECT_DIR="/home/ponkis/lyve"
-PM2_APP_NAME="lyve-backend"
+PM2_APP_NAME="lyve"
 
 echo "📂 navigating to project directory..."
 cd "$PROJECT_DIR"
