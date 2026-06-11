@@ -991,20 +991,65 @@ footer a:hover {
 	}
 
 	.app-shell {
-		padding-top: 14px;
+		min-height: 100vh;
+		min-height: 100svh;
+		padding: 42px 0;
+		justify-content: center;
 	}
 
 	.hero-copy {
-		font-size: 4.2rem;
+		font-size: 4.45rem;
+		line-height: 0.82;
+		text-align: center;
 	}
 
 	.workspace-panel {
 		padding: 18px;
 	}
 
+	.studio-layout {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: 30px;
+		min-height: auto;
+		padding: 0;
+		flex: 0 0 auto;
+	}
+
+	.brand-panel {
+		width: 100%;
+		max-width: none;
+	}
+
 	.session-grid,
 	.main-actions {
 		grid-template-columns: 1fr;
+	}
+
+	.player-section.is-compact .main-actions {
+		grid-template-columns: 1fr 1fr;
+	}
+
+	.info-box,
+	.controls-box {
+		min-height: 0;
+		padding: 13px 14px;
+	}
+
+	.info-box p {
+		font-size: 0.86rem;
+	}
+
+	.main-actions {
+		margin-top: 12px;
+	}
+
+	.start-button,
+	.reset-button,
+	.download-ponk-button,
+	.reprocess-button {
+		min-height: 44px;
 	}
 
 	footer {
@@ -1049,7 +1094,7 @@ footer a:hover {
 	}
 
 	.hero-copy {
-		font-size: 3.35rem;
+		font-size: 4rem;
 	}
 
 	.upload-button,
