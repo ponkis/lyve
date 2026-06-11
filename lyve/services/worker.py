@@ -5,7 +5,7 @@ import hashlib
 import queue as pyqueue
 import threading
 from datetime import datetime, timezone
-import librosa
+import mutagen
 
 from lyve.config import Config
 from lyve.services.metadata import extract_metadata_and_bpm
@@ -45,6 +45,23 @@ def save_cached_ponk(file_hash, data):
             json.dump(data, f, ensure_ascii=False)
     except Exception as e:
         print(f"Failed to save .ponk file {path}: {e}")
+
+
+def get_audio_duration(file_path):
+    try:
+        audio = mutagen.File(file_path)
+        duration = getattr(getattr(audio, "info", None), "length", None)
+        if duration is not None:
+            return float(duration)
+    except Exception as e:
+        print(f"Error getting duration from metadata: {e}")
+
+    try:
+        import librosa
+        return float(librosa.get_duration(path=file_path))
+    except Exception as e:
+        print(f"Error getting duration from decoder: {e}")
+        return None
 
 
 def cleanup_worker():
@@ -186,11 +203,8 @@ def process_file_async(filepath, file_hash, filename, is_ponk_validation=False, 
 
     write_progress(1, "starting")
 
-    # Get duration early for API matching
-    try:
-        duration = librosa.get_duration(path=filepath)
-    except Exception as e:
-        print(f"Error getting duration early: {e}")
+    # Get duration early for API matching without decoding the whole audio when possible.
+    duration = get_audio_duration(filepath)
 
     # Extract tags & parse filename
     artist, title, album, tag_bpm = extract_metadata_and_bpm(filepath, original_filename or filename)
@@ -252,10 +266,7 @@ def process_file_async(filepath, file_hash, filename, is_ponk_validation=False, 
 
         # Get final duration if we haven't already
         if duration is None:
-            try:
-                duration = librosa.get_duration(path=filepath)
-            except Exception:
-                duration = None
+            duration = get_audio_duration(filepath)
 
         file_size = os.path.getsize(filepath)
 
@@ -266,7 +277,8 @@ def process_file_async(filepath, file_hash, filename, is_ponk_validation=False, 
             "bpm": bpm,
             "lyrics_source": lyrics_source,
             "metadata": {
-                "originalFilename": filename,
+                "originalFilename": original_filename or filename,
+                "storedFilename": filename,
                 "fileSize": file_size,
                 "duration": duration,
             },
@@ -275,7 +287,7 @@ def process_file_async(filepath, file_hash, filename, is_ponk_validation=False, 
         cached_obj = response_payload.copy()
         cached_obj["filename"] = filename
         cached_obj["_meta"] = {
-            "originalFilename": filename,
+            "originalFilename": original_filename or filename,
             "cached_at": datetime.now(timezone.utc).isoformat(),
         }
         save_cached_ponk(file_hash, cached_obj)

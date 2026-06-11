@@ -85,6 +85,25 @@ let flashInterval = null;
 let flashTimeout = null;
 let ponkFileContent = null;
 
+const allowedAudioExtensions = new Set(['mp3', 'wav', 'flac', 'ogg', 'm4a']);
+const allowedAudioTypes = new Set([
+   'audio/aac',
+   'audio/flac',
+   'audio/m4a',
+   'audio/mp4',
+   'audio/mpeg',
+   'audio/mp3',
+   'audio/ogg',
+   'audio/wav',
+   'audio/wave',
+   'audio/x-flac',
+   'audio/x-m4a',
+   'audio/x-mpeg',
+   'audio/x-wav',
+   'application/ogg',
+   'video/mp4'
+]);
+
 let currentScale = 1.0;
 let targetScale = 1.0;
 let currentX = 0,
@@ -123,6 +142,13 @@ fileInput.addEventListener('change', async (e) => {
    const file = e.target.files[0];
    if (!file) return;
 
+   const validationMessage = validateSelectedAudioFile(file);
+   if (validationMessage) {
+      alert(validationMessage);
+      fileInput.value = '';
+      return;
+   }
+
    try {
       const tempAudio = new Audio(URL.createObjectURL(file));
       await new Promise((resolve, reject) => {
@@ -142,8 +168,9 @@ fileInput.addEventListener('change', async (e) => {
          tempAudio.addEventListener('loadedmetadata', onMeta);
          tempAudio.addEventListener('error', onErr);
       });
-      if (tempAudio.duration > 270) {
-         alert(`The file ${file.name} exceeds the maximum duration of 4:30 minutes.`);
+      const maxDuration = Number(fileInput.dataset.maxDuration || 270);
+      if (tempAudio.duration > maxDuration) {
+         alert(`The file ${file.name} exceeds the maximum duration of ${formatTime(maxDuration)} minutes.`);
 
          fileInput.value = '';
          return;
@@ -204,7 +231,7 @@ fileInput.addEventListener('change', async (e) => {
             statusSpan.textContent = 'Processing uploaded file (0%)...';
 
             if (data.queue_position) {
-               statusSpan.textContent = `Queued ${data.queue_position} — please wait...`;
+               statusSpan.textContent = `Queued ${data.queue_position} - please wait...`;
             }
 
             let attempts = 0;
@@ -219,7 +246,7 @@ fileInput.addEventListener('change', async (e) => {
 
                      if (statusText === 'queued') {
                         const pos = stj.queue_position != null ? stj.queue_position : '';
-                        statusSpan.textContent = pos ? `Queued ${pos} — please wait...` : 'Queued — please wait...';
+                        statusSpan.textContent = pos ? `Queued ${pos} - please wait...` : 'Queued - please wait...';
                      } else {
                         statusSpan.textContent = `Processing uploaded file (${prog}%)...`;
                      }
@@ -488,6 +515,40 @@ function formatTime(seconds) {
    const mins = Math.floor(seconds / 60);
    const secs = Math.floor(seconds % 60);
    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function formatBytes(bytes) {
+   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+   const units = ['B', 'KB', 'MB', 'GB'];
+   let size = bytes;
+   let unitIndex = 0;
+   while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex++;
+   }
+   return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function validateSelectedAudioFile(file) {
+   const extension = (file.name.split('.').pop() || '').toLowerCase();
+   if (!allowedAudioExtensions.has(extension)) {
+      return 'Please choose an MP3, WAV, FLAC, OGG, or M4A audio file.';
+   }
+
+   if (file.type && !allowedAudioTypes.has(file.type.toLowerCase())) {
+      return 'This file does not report an allowed audio content type.';
+   }
+
+   const maxSize = Number(fileInput.dataset.maxSize || 0);
+   if (maxSize && file.size > maxSize) {
+      return `The file ${file.name} is too large. Maximum size is ${formatBytes(maxSize)}.`;
+   }
+
+   if (file.size <= 0) {
+      return 'The selected file is empty.';
+   }
+
+   return '';
 }
 
 audioPlayer.addEventListener('timeupdate', () => {

@@ -1,16 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
    <head>
+      {% set canonical_url = (config.PUBLIC_BASE_URL ~ request.path) if config.PUBLIC_BASE_URL else request.url %}
+      {% set social_image_url = (config.PUBLIC_BASE_URL ~ url_for('static', filename=config.SOCIAL_IMAGE)) if config.PUBLIC_BASE_URL else url_for('static', filename=config.SOCIAL_IMAGE, _external=True) %}
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Lyve</title>
+      <title>{{ config.SITE_TITLE }}</title>
+      <meta name="description" content="{{ config.SITE_DESCRIPTION }}">
+      <meta name="robots" content="index,follow">
+      <meta name="application-name" content="{{ config.SITE_NAME }}">
+      <meta name="theme-color" content="#0a0a0a">
+      <link rel="canonical" href="{{ canonical_url }}">
+      <meta property="og:locale" content="en_US">
+      <meta property="og:type" content="website">
+      <meta property="og:site_name" content="{{ config.SITE_NAME }}">
+      <meta property="og:title" content="{{ config.SITE_TITLE }}">
+      <meta property="og:description" content="{{ config.SITE_DESCRIPTION }}">
+      <meta property="og:url" content="{{ canonical_url }}">
+      <meta property="og:image" content="{{ social_image_url }}">
+      <meta property="og:image:secure_url" content="{{ social_image_url }}">
+      <meta property="og:image:type" content="image/png">
+      <meta property="og:image:width" content="1200">
+      <meta property="og:image:height" content="630">
+      <meta property="og:image:alt" content="Lyve audio upload and lyric visualizer preview">
+      <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="{{ config.SITE_TITLE }}">
+      <meta name="twitter:description" content="{{ config.SITE_DESCRIPTION }}">
+      <meta name="twitter:image" content="{{ social_image_url }}">
+      <meta name="twitter:image:alt" content="Lyve audio upload and lyric visualizer preview">
       <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon-96x96.png') }}" sizes="96x96" />
       <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}" />
       <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" />
       <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}" />
       <meta name="apple-mobile-web-app-title" content="Lyve" />
       <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}" />
-      <link rel="stylesheet" href="/static/style.css">
+      <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
       <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;700&display=swap" rel="stylesheet">
       <style>
          .title {
@@ -39,7 +63,7 @@
                   <button id="load-ponk-btn" class="upload-button secondary">Load .ponk File</button>
                   <button id="upload-btn" class="upload-button">Choose Audio File</button>
                </div>
-               <input type="file" id="file-input" accept=".mp3,.wav,.flac,.ogg,.m4a" hidden>
+               <input type="file" id="file-input" accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/flac,audio/x-flac,audio/ogg,audio/mp4,audio/x-m4a,.mp3,.wav,.flac,.ogg,.m4a" data-max-size="{{ config.MAX_CONTENT_LENGTH }}" data-max-duration="{{ config.MAX_AUDIO_DURATION_SECONDS }}" hidden>
                <input type="file" id="ponk-file-input" accept=".ponk" hidden>
                <div id="loading" class="loading" style="display: none;">
                   <div class="spinner"></div>
@@ -113,6 +137,6 @@
             <button id="ponk-modal-select-btn" class="upload-button">Select Audio File</button>
          </div>
       </div>
-      <script src="/static/script.js"></script>
+      <script src="{{ url_for('static', filename='script.js') }}"></script>
    </body>
 </html>

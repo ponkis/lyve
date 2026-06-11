@@ -1,7 +1,6 @@
 import urllib.request
 import urllib.parse
 import json
-import librosa
 
 def fetch_bpm_from_deezer(artist, title):
     """
@@ -47,6 +46,7 @@ def fetch_bpm_from_deezer(artist, title):
 
 def detect_bpm(file_path):
     try:
+        import librosa
         y, sr = librosa.load(file_path, duration=60)
         onset_env = librosa.onset.onset_strength(y=y, sr=sr)
         tempo = librosa.feature.tempo(onset_envelope=onset_env, sr=sr)
@@ -60,6 +60,7 @@ def detect_bpm(file_path):
     except AttributeError as e:
         print(f"AttributeError in BPM detection (scipy issue): {e}")
         try:
+            import librosa
             y, sr = librosa.load(file_path, duration=30)
             tempo = librosa.feature.tempo(y=y, sr=sr)
             if tempo is not None and len(tempo) > 0:

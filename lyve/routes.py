@@ -1,6 +1,5 @@
-from flask import Blueprint, render_template, request, jsonify, send_from_directory
+from flask import Blueprint, abort, render_template, request, jsonify, send_from_directory
 from werkzeug.exceptions import RequestEntityTooLarge
-from werkzeug.utils import secure_filename
 import os
 from datetime import datetime, timezone
 
@@ -12,6 +11,11 @@ from lyve.services.worker import (
     load_cached_ponk,
     compute_file_hash_bytes
 )
+from lyve.services.upload_validation import (
+    UploadValidationError,
+    is_safe_upload_filename,
+    validate_and_store_audio_upload,
+)
 
 lyve_bp = Blueprint(
     "lyve", 
@@ -19,10 +23,6 @@ lyve_bp = Blueprint(
     template_folder="../templates", 
     static_folder="../static"
 )
-
-
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in Config.ALLOWED_EXTENSIONS
 
 
 @lyve_bp.route("/")
@@ -37,16 +37,17 @@ def discord_verification():
 
 @lyve_bp.route("/upload", methods=["POST"])
 def upload_file():
-    try:
-        print("=== /upload request ===")
-        print("remote_addr=", request.remote_addr)
-        print("host=", request.host)
-        print("url=", request.url)
-        for h in ["Host", "Content-Type", "Content-Length", "X-Forwarded-For", "Referer", "User-Agent"]:
-            print(f"{h}: {request.headers.get(h)}")
-        print("======================")
-    except Exception as _e:
-        print("Failed to log request headers:", _e)
+    if Config.DEBUG_UPLOAD_LOGS:
+        try:
+            print("=== /upload request ===")
+            print("remote_addr=", request.remote_addr)
+            print("host=", request.host)
+            print("url=", request.url)
+            for h in ["Host", "Content-Type", "Content-Length", "X-Forwarded-For", "Referer", "User-Agent"]:
+                print(f"{h}: {request.headers.get(h)}")
+            print("======================")
+        except Exception as _e:
+            print("Failed to log request headers:", _e)
 
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
@@ -56,92 +57,93 @@ def upload_file():
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    if file and allowed_file(file.filename):
-        try:
-            print(
-                f"{datetime.now(timezone.utc).isoformat()} RECEIVED /upload for filename={file.filename} client={request.remote_addr}"
-            )
-        except Exception:
-            pass
-            
-        file_bytes = file.read()
-        file_hash = compute_file_hash_bytes(file_bytes)
+    upload_limit = Config.MAX_CONTENT_LENGTH or (50 * 1024 * 1024)
+    file_bytes = file.stream.read(upload_limit + 1)
+    if len(file_bytes) > upload_limit:
+        return jsonify({"error": "File too large", "status": 413}), 413
 
-        cached = load_cached_ponk(file_hash)
-        if cached is not None:
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(Config.UPLOAD_FOLDER, filename)
-            try:
-                with open(filepath, "wb") as f:
-                    f.write(file_bytes)
-            except Exception as e:
-                print(f"Failed to write temp upload file: {e}")
+    try:
+        validated = validate_and_store_audio_upload(file, file_bytes)
+    except UploadValidationError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        print(f"Failed to validate uploaded file: {e}")
+        return jsonify({"error": "Failed to validate uploaded audio"}), 500
 
-            resp = cached.copy()
-            resp["from_cache"] = True
-            resp["filename"] = filename
-            return jsonify(resp)
+    file_hash = validated.file_hash
+    filename = validated.filename
+    filepath = validated.filepath
 
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(Config.UPLOAD_FOLDER, filename)
-        try:
-            with open(filepath, "wb") as f:
-                f.write(file_bytes)
-        except Exception as e:
-            print(f"Failed to save uploaded file: {e}")
-            return jsonify({"error": "Failed to save file"}), 500
-
-        is_ponk_validation = request.form.get("is_ponk_validation", "false") == "true"
-
-        try:
-            progress_path = os.path.join(Config.CACHE_FOLDER, f"{file_hash}.progress.json")
-            try:
-                with open(progress_path, "w", encoding="utf-8") as pf:
-                    json_dump_data = {
-                        "progress": 0,
-                        "status": "queued",
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                    }
-                    import json
-                    json.dump(json_dump_data, pf)
-            except Exception as _e:
-                print(f"Failed to write initial progress for {file_hash}: {_e}")
-
-            with pending_lock:
-                pending_jobs.append(file_hash)
-                queue_position = len(pending_jobs)
-
-            processing_queue.put((filepath, file_hash, filename, is_ponk_validation, file.filename))
-        except Exception as e:
-            print(f"Failed to enqueue background worker: {e}")
-            return jsonify({"error": "Failed to start processing"}), 500
-
-        try:
-            print(
-                f"{datetime.now(timezone.utc).isoformat()} RETURNING 202 for file_hash={file_hash} filename={filename}"
-            )
-        except Exception:
-            pass
-            
-        return (
-            jsonify(
-                {
-                    "success": True,
-                    "status": "queued",
-                    "file_hash": file_hash,
-                    "filename": filename,
-                    "queue_position": queue_position,
-                }
-            ),
-            202,
+    try:
+        print(
+            f"{datetime.now(timezone.utc).isoformat()} ACCEPTED /upload stored={filename} client={request.remote_addr}"
         )
+    except Exception:
+        pass
 
-    return jsonify({"error": "Invalid file type"}), 400
+    cached = load_cached_ponk(file_hash)
+    if cached is not None:
+        resp = cached.copy()
+        resp["from_cache"] = True
+        resp["filename"] = filename
+        return jsonify(resp)
+
+    is_ponk_validation = request.form.get("is_ponk_validation", "false") == "true"
+
+    try:
+        progress_path = os.path.join(Config.CACHE_FOLDER, f"{file_hash}.progress.json")
+        try:
+            with open(progress_path, "w", encoding="utf-8") as pf:
+                json_dump_data = {
+                    "progress": 0,
+                    "status": "queued",
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+                import json
+                json.dump(json_dump_data, pf)
+        except Exception as _e:
+            print(f"Failed to write initial progress for {file_hash}: {_e}")
+
+        with pending_lock:
+            if file_hash not in pending_jobs:
+                pending_jobs.append(file_hash)
+            queue_position = pending_jobs.index(file_hash) + 1
+
+        processing_queue.put(
+            (filepath, file_hash, filename, is_ponk_validation, validated.original_filename)
+        )
+    except Exception as e:
+        print(f"Failed to enqueue background worker: {e}")
+        return jsonify({"error": "Failed to start processing"}), 500
+
+    try:
+        print(
+            f"{datetime.now(timezone.utc).isoformat()} RETURNING 202 for file_hash={file_hash} filename={filename}"
+        )
+    except Exception:
+        pass
+
+    return (
+        jsonify(
+            {
+                "success": True,
+                "status": "queued",
+                "file_hash": file_hash,
+                "filename": filename,
+                "queue_position": queue_position,
+            }
+        ),
+        202,
+    )
 
 
 @lyve_bp.route("/uploads/<filename>")
 def uploaded_file(filename):
-    return send_from_directory(Config.UPLOAD_FOLDER, filename)
+    if not is_safe_upload_filename(filename):
+        abort(404)
+    response = send_from_directory(Config.UPLOAD_FOLDER, filename, max_age=Config.UPLOAD_TTL_SECONDS)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @lyve_bp.route("/status/<file_hash>")
