@@ -37,6 +37,7 @@
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
       <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+      <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
       <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
    </head>
    <body>
@@ -48,6 +49,10 @@
                <div class="progress-bar-fill" id="progress-bar-fill"></div>
             </div>
             <span class="progress-time total-time" id="progress-total-time">0:00</span>
+         </div>
+         <div class="rotate-phone-hint" id="rotate-phone-hint" aria-live="polite">
+            <i class="ph ph-device-rotate rotate-phone-icon" aria-hidden="true"></i>
+            <span>Rotate phone</span>
          </div>
          <div id="lyrics-world"></div>
          <div class="esc-hint">Press ESC to exit</div>

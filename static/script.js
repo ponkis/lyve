@@ -82,11 +82,14 @@ const ponkModalSelectBtn = document.getElementById('ponk-modal-select-btn');
 const progressBarFill = document.getElementById('progress-bar-fill');
 const progressCurrentTime = document.getElementById('progress-current-time');
 const progressTotalTime = document.getElementById('progress-total-time');
+const rotatePhoneHint = document.getElementById('rotate-phone-hint');
 
 let flashInterval = null;
 let flashTimeout = null;
 let ponkFileContent = null;
 let modalScrollY = 0;
+let rotateHintTimeout = null;
+let rotateHintShownForSession = false;
 
 function setLoadingStatus(message) {
    if (!loading) return;
@@ -153,6 +156,33 @@ function hidePonkModal() {
    unlockModalScroll();
 }
 
+function isMobilePortraitPreview() {
+   const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+   const narrowViewport = window.innerWidth <= 820;
+   const portrait = window.innerHeight > window.innerWidth;
+   return portrait && (coarsePointer || narrowViewport);
+}
+
+function hideRotateHint() {
+   if (rotateHintTimeout) {
+      clearTimeout(rotateHintTimeout);
+      rotateHintTimeout = null;
+   }
+   if (rotatePhoneHint) rotatePhoneHint.classList.remove('active');
+}
+
+function showRotateHintIfNeeded() {
+   if (!rotatePhoneHint || rotateHintShownForSession || !isMobilePortraitPreview()) return;
+   rotateHintShownForSession = true;
+   rotatePhoneHint.classList.add('active');
+   rotateHintTimeout = setTimeout(hideRotateHint, 5200);
+}
+
+function updateRotateHintForViewport() {
+   if (!visualizationMode || !visualizationMode.classList.contains('active')) return;
+   if (!isMobilePortraitPreview()) hideRotateHint();
+}
+
 const allowedAudioExtensions = new Set(['mp3', 'wav', 'flac', 'ogg', 'm4a']);
 const allowedAudioTypes = new Set([
    'audio/aac',
@@ -199,6 +229,11 @@ canvas.height = window.innerHeight;
 window.addEventListener('resize', () => {
    canvas.width = window.innerWidth;
    canvas.height = window.innerHeight;
+   updateRotateHintForViewport();
+});
+
+window.addEventListener('orientationchange', () => {
+   setTimeout(updateRotateHintForViewport, 250);
 });
 
 uploadBtn.addEventListener('click', () => {
@@ -466,6 +501,8 @@ startBtn.addEventListener('click', () => {
 
    mainContainer.classList.add('hidden');
    visualizationMode.classList.add('active');
+   rotateHintShownForSession = false;
+   showRotateHintIfNeeded();
 
    document.body.classList.add('no-scroll');
 
@@ -505,6 +542,7 @@ function exitVisualization() {
    if (progressTotalTime) progressTotalTime.textContent = '0:00';
 
    visualizationMode.classList.remove('active');
+   hideRotateHint();
    visualizationMode.removeEventListener('wheel', handleZoom);
    visualizationMode.removeEventListener('mousedown', handleDragStart);
    visualizationMode.removeEventListener('mousemove', handleDragMove);
