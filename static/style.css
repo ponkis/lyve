@@ -105,7 +105,7 @@ button {
 	width: min(1040px, calc(100% - 40px));
 	min-height: 100vh;
 	margin: 0 auto;
-	padding: 24px 0 18px;
+	padding: 0;
 	display: flex;
 	flex-direction: column;
 	transition: opacity 0.3s ease;
@@ -122,39 +122,6 @@ button {
 	pointer-events: none;
 }
 
-.topbar {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 20px;
-	min-height: 52px;
-	padding-bottom: 18px;
-	border-bottom: 1px solid var(--line);
-}
-
-.brand-lockup {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	min-width: 0;
-}
-
-.brand-mark {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 34px;
-	height: 34px;
-	flex: 0 0 auto;
-	border: 1px solid rgba(125, 220, 255, 0.32);
-	border-radius: 8px;
-	background: rgba(125, 220, 255, 0.11);
-	color: var(--accent-strong);
-	font-family: var(--font-serif);
-	font-size: 1.2rem;
-	font-weight: 700;
-}
-
 .eyebrow,
 .panel-kicker,
 .panel-badge,
@@ -167,56 +134,13 @@ button {
 	letter-spacing: 0;
 }
 
-.title {
-	color: var(--text);
-	font-family: var(--font-display);
-	font-size: 1.58rem;
-	font-weight: 700;
-	line-height: 1.1;
-	letter-spacing: 0;
-}
-
-.powered-by {
-	display: inline-flex;
-	align-items: center;
-	gap: 9px;
-	color: var(--muted);
-	font-size: 0.85rem;
-	font-weight: 600;
-	letter-spacing: 0;
-	white-space: nowrap;
-}
-
-.powered-by a {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	height: 30px;
-	padding: 4px 8px;
-	border: 1px solid var(--line);
-	border-radius: 8px;
-	background: rgba(255, 255, 255, 0.04);
-	transition: background 0.16s ease, border-color 0.16s ease;
-}
-
-.powered-by a:hover {
-	border-color: rgba(125, 220, 255, 0.36);
-	background: rgba(125, 220, 255, 0.08);
-}
-
-.logo {
-	display: block;
-	height: 20px;
-	width: auto;
-}
-
 .studio-layout {
 	flex: 1;
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
 	gap: 44px;
 	align-items: center;
-	padding: 38px 0 26px;
+	padding: 0;
 }
 
 .brand-panel {
@@ -226,30 +150,9 @@ button {
 .hero-copy {
 	color: var(--text);
 	font-family: var(--font-display);
-	font-size: 2.85rem;
+	font-size: 7rem;
 	font-weight: 600;
-	line-height: 0.98;
-	letter-spacing: 0;
-}
-
-.feature-row {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	margin-top: 20px;
-}
-
-.feature-row span {
-	display: inline-flex;
-	align-items: center;
-	min-height: 30px;
-	padding: 5px 10px;
-	border: 1px solid var(--line);
-	border-radius: 999px;
-	background: rgba(255, 255, 255, 0.035);
-	color: var(--muted);
-	font-size: 0.82rem;
-	font-weight: 600;
+	line-height: 0.82;
 	letter-spacing: 0;
 }
 
@@ -269,38 +172,6 @@ button {
 	inset: 0 0 auto 0;
 	height: 1px;
 	background: linear-gradient(90deg, rgba(125, 220, 255, 0), rgba(125, 220, 255, 0.9), rgba(183, 243, 108, 0));
-}
-
-.panel-header {
-	display: flex;
-	align-items: flex-start;
-	justify-content: space-between;
-	gap: 16px;
-	margin-bottom: 22px;
-}
-
-.panel-title {
-	margin-top: 3px;
-	color: var(--text);
-	font-family: var(--font-serif);
-	font-size: 1.62rem;
-	font-weight: 700;
-	line-height: 1;
-	letter-spacing: 0;
-}
-
-.panel-badge {
-	display: inline-flex;
-	align-items: center;
-	min-height: 28px;
-	padding: 5px 9px;
-	border: 1px solid var(--line);
-	border-radius: 999px;
-	background: rgba(255, 255, 255, 0.04);
-	color: var(--muted);
-	text-transform: none;
-	font-size: 0.78rem;
-	font-weight: 700;
 }
 
 .upload-section,
@@ -1101,7 +972,7 @@ footer a:hover {
 	}
 
 	.hero-copy {
-		font-size: 1.95rem;
+		font-size: 5.4rem;
 	}
 }
 
@@ -1123,29 +994,12 @@ footer a:hover {
 		padding-top: 14px;
 	}
 
-	.topbar {
-		align-items: flex-start;
-		gap: 14px;
-	}
-
-	.powered-by span {
-		display: none;
-	}
-
 	.hero-copy {
-		font-size: 1.6rem;
-	}
-
-	.feature-row {
-		margin-top: 14px;
+		font-size: 4.2rem;
 	}
 
 	.workspace-panel {
 		padding: 18px;
-	}
-
-	.panel-header {
-		margin-bottom: 18px;
 	}
 
 	.session-grid,
@@ -1190,21 +1044,12 @@ footer a:hover {
 }
 
 @media (max-width: 420px) {
-	.brand-lockup {
-		gap: 9px;
-	}
-
-	.brand-mark {
-		width: 32px;
-		height: 32px;
-	}
-
-	.title {
-		font-size: 1.02rem;
-	}
-
 	.workspace-panel {
 		padding: 15px;
+	}
+
+	.hero-copy {
+		font-size: 3.35rem;
 	}
 
 	.upload-button,

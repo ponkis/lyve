@@ -134,11 +134,23 @@ function hideLoadingModal() {
    if (!loading) return;
    loading.classList.remove('active');
    setTimeout(() => {
-         if (!loading.classList.contains('active')) {
+      if (!loading.classList.contains('active')) {
             loading.style.display = 'none';
             unlockModalScroll();
          }
-      }, 240);
+   }, 240);
+}
+
+function showPonkModal() {
+   if (!ponkModal) return;
+   lockModalScroll();
+   ponkModal.classList.add('active');
+}
+
+function hidePonkModal() {
+   if (!ponkModal) return;
+   ponkModal.classList.remove('active');
+   unlockModalScroll();
 }
 
 const allowedAudioExtensions = new Set(['mp3', 'wav', 'flac', 'ogg', 'm4a']);
@@ -904,7 +916,7 @@ ponkFileInput.addEventListener('change', (e) => {
          // Display modal to ensure user-gesture compliance
          if (ponkModal && ponkModalFilename) {
             ponkModalFilename.textContent = ponkFileContent.metadata.originalFilename;
-            ponkModal.classList.add('active');
+            showPonkModal();
          }
 
          if (loadPonkBtn) loadPonkBtn.classList.add('loaded');
@@ -921,7 +933,7 @@ ponkFileInput.addEventListener('change', (e) => {
 if (ponkModalSelectBtn) {
    ponkModalSelectBtn.addEventListener('click', () => {
       if (fileInput) fileInput.click();
-      if (ponkModal) ponkModal.classList.remove('active');
+      hidePonkModal();
    });
 }
 

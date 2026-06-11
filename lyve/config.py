@@ -45,7 +45,7 @@ class Config:
     # Public site metadata
     PUBLIC_BASE_URL = os.environ.get("LYVE_PUBLIC_BASE_URL", "").rstrip("/")
     SITE_NAME = "Lyve"
-    SITE_TITLE = "Lyve - AI Lyrics Visualizer"
+    SITE_TITLE = "Lyve"
     SITE_DESCRIPTION = (
         "Upload a song and turn it into a real-time lyric visualizer with synced lyrics, "
         "BPM detection, and downloadable .ponk sessions."
