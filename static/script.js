@@ -72,6 +72,8 @@ const ponkFileInput = document.getElementById('ponk-file-input');
 const downloadPonkBtn = document.getElementById('download-ponk-btn');
 const lyricsWorld = document.getElementById('lyrics-world');
 const footer = document.querySelector('footer');
+const panelTitle = document.getElementById('panel-title');
+const panelBadge = document.getElementById('panel-badge');
 
 // Progress Bar & .ponk Upload Modal Selectors
 const ponkModal = document.getElementById('ponk-modal');
@@ -84,6 +86,60 @@ const progressTotalTime = document.getElementById('progress-total-time');
 let flashInterval = null;
 let flashTimeout = null;
 let ponkFileContent = null;
+let modalScrollY = 0;
+
+function setLoadingStatus(message) {
+   if (!loading) return;
+   const statusSpan = loading.querySelector('.status-text');
+   if (statusSpan) statusSpan.textContent = message;
+}
+
+function setSessionState(title, badge) {
+   if (panelTitle) panelTitle.textContent = title;
+   if (panelBadge) panelBadge.textContent = badge;
+}
+
+function setPlayerEditorMode(hasEditor) {
+   if (!playerSection) return;
+   playerSection.classList.toggle('has-lyrics-editor', hasEditor);
+   playerSection.classList.toggle('is-compact', !hasEditor);
+}
+
+function lockModalScroll() {
+   modalScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+   document.documentElement.classList.add('modal-open');
+   document.body.classList.add('modal-open');
+   document.body.style.top = `-${modalScrollY}px`;
+}
+
+function unlockModalScroll() {
+   document.documentElement.classList.remove('modal-open');
+   document.body.classList.remove('modal-open');
+   document.body.style.top = '';
+   window.scrollTo(0, modalScrollY);
+}
+
+function showLoadingModal(message = 'Waiting to start...') {
+   if (!loading) return;
+   setSessionState('Processing audio', 'Working');
+   setLoadingStatus(message);
+   lockModalScroll();
+   loading.style.display = 'flex';
+   requestAnimationFrame(() => {
+      loading.classList.add('active');
+   });
+}
+
+function hideLoadingModal() {
+   if (!loading) return;
+   loading.classList.remove('active');
+   setTimeout(() => {
+         if (!loading.classList.contains('active')) {
+            loading.style.display = 'none';
+            unlockModalScroll();
+         }
+      }, 240);
+}
 
 const allowedAudioExtensions = new Set(['mp3', 'wav', 'flac', 'ogg', 'm4a']);
 const allowedAudioTypes = new Set([
@@ -180,7 +236,7 @@ fileInput.addEventListener('change', async (e) => {
       console.warn('Could not verify file duration prior to upload:', err);
    }
 
-   loading.style.display = 'block';
+   showLoadingModal('Preparing upload...');
 
    uploadBtn.disabled = true;
 
@@ -278,7 +334,7 @@ fileInput.addEventListener('change', async (e) => {
             if (ponkMeta.fileSize !== audioMeta.fileSize || Math.abs(ponkMeta.duration - audioMeta.duration) > 0.1) {
                alert('Audio file does not match the loaded .ponk file. Please select the correct audio file.');
                ponkFileContent = null;
-               loading.style.display = 'none';
+               hideLoadingModal();
                uploadBtn.disabled = false;
                fileInput.value = '';
                return;
@@ -298,22 +354,23 @@ fileInput.addEventListener('change', async (e) => {
             if (data.lyrics_source && data.lyrics_source.startsWith('lrclib')) {
                lyricsEditSection.style.display = 'none';
                downloadPonkBtn.style.display = 'none';
+               setPlayerEditorMode(false);
             } else {
                lyricsEditSection.style.display = 'block';
                lyricsEditorAi.style.display = 'block';
                populateTimedWordsEditor(data.words);
                downloadPonkBtn.style.display = 'block';
+               setPlayerEditorMode(true);
             }
 
+            setSessionState('Audio ready', 'Ready');
             uploadSection.style.display = 'none';
             playerSection.style.display = 'block';
 
             const statusSpan = loading.querySelector('.status-text');
             if (statusSpan) statusSpan.textContent = 'Processing complete.';
 
-            setTimeout(() => {
-               loading.style.display = 'none';
-            }, 800);
+            setLoadingStatus('Processing complete.');
             uploadBtn.disabled = false;
             ponkFileContent = null;
             return;
@@ -342,13 +399,16 @@ fileInput.addEventListener('change', async (e) => {
          if (data.lyrics_source && data.lyrics_source.startsWith('lrclib')) {
             lyricsEditSection.style.display = 'none';
             downloadPonkBtn.style.display = 'none';
+            setPlayerEditorMode(false);
          } else {
             lyricsEditSection.style.display = 'block';
             lyricsEditorAi.style.display = 'block';
             populateTimedWordsEditor(data.words);
             downloadPonkBtn.style.display = 'block';
+            setPlayerEditorMode(true);
          }
 
+         setSessionState('Audio ready', 'Ready');
          uploadSection.style.display = 'none';
          playerSection.style.display = 'block';
 
@@ -359,7 +419,7 @@ fileInput.addEventListener('change', async (e) => {
    } catch (error) {
       alert('Error uploading file: ' + error.message);
    } finally {
-      loading.style.display = 'none';
+      hideLoadingModal();
       uploadBtn.disabled = false;
    }
 });
@@ -483,12 +543,14 @@ resetBtn.addEventListener('click', () => {
    playerSection.style.display = 'none';
    uploadSection.style.display = 'block';
    startBtn.disabled = false;
+   setSessionState('Start a session', 'Ready');
 
    if (fileInput) fileInput.value = '';
    if (lyricsTextarea) lyricsTextarea.value = '';
    if (bpmDoubleCheckbox) bpmDoubleCheckbox.checked = false;
 
    if (loadPonkBtn) loadPonkBtn.classList.remove('loaded');
+   setPlayerEditorMode(true);
 });
 
 bpmDoubleCheckbox.addEventListener('change', () => {
